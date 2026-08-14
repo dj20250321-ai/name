@@ -50,10 +50,10 @@ st.markdown("""
 
 
 # ==========================================
-# 2. 게임 초기화 함수
+# 2. 게임 초기화 함수 및 최상단 상태 보장
 # ==========================================
 def init_game():
-    st.session_state.game_state = "CHARACTER_CREATION"  # CREATE, EVENT, DICE_CHECK, ENDING
+    st.session_state.game_state = "CHARACTER_CREATION"  # CREATE, EVENT, DICE_RESULT, ENDING, GAME_OVER
     st.session_state.name = "모험가"
     
     # 기본 능력치
@@ -74,8 +74,8 @@ def init_game():
     st.session_state.current_event = None
     st.session_state.last_result = None
 
-
-if "game_state" not in st.session_state:
+# 앱 시작 시 세션 상태가 없으면 가장 먼저 초기화
+if "game_state" not in st.session_state or "name" not in st.session_state:
     init_game()
 
 
@@ -100,8 +100,13 @@ def roll_dice(stat_name, difficulty):
 
 
 # ==========================================
-# 4. 랜덤 이벤트 데이터베이스
+# 4. 상태 업데이트 및 이벤트 시스템
 # ==========================================
+def update_state(hp=0, gold=0):
+    st.session_state.hp = max(0, min(st.session_state.max_hp, st.session_state.hp + hp))
+    st.session_state.gold = max(0, st.session_state.gold + gold)
+
+
 EVENTS = [
     {
         "id": "goblin_ambush",
@@ -181,11 +186,6 @@ EVENTS = [
 ]
 
 
-def update_state(hp=0, gold=0):
-    st.session_state.hp = max(0, min(st.session_state.max_hp, st.session_state.hp + hp))
-    st.session_state.gold = max(0, st.session_state.gold + gold)
-
-
 def next_event():
     if st.session_state.hp <= 0:
         st.session_state.game_state = "GAME_OVER"
@@ -197,12 +197,12 @@ def next_event():
 
 
 # ==========================================
-# 5. 화면별 UI 렌더링
+# 5. 안전한 사이드바 (캐릭터 상태창)
 # ==========================================
-
-# 사이드바 (캐릭터 상태창)
 st.sidebar.title("📜 모험가 상태")
-if st.session_state.game_state != "CHARACTER_CREATION":
+
+# 'name'이 존재하는지 안전하게 확인 후 출력
+if "name" in st.session_state and st.session_state.game_state != "CHARACTER_CREATION":
     st.sidebar.subheader(f"👤 {st.session_state.name}")
     st.sidebar.write(f"📅 **모험 {st.session_state.day} 일차** / {st.session_state.max_day}일")
     st.sidebar.progress(st.session_state.hp / st.session_state.max_hp)
@@ -225,6 +225,10 @@ if st.sidebar.button("🔄 처음부터 다시 시작"):
     st.rerun()
 
 
+# ==========================================
+# 6. 메인 화면 UI 렌더링
+# ==========================================
+
 # A. 캐릭터 생성 화면
 if st.session_state.game_state == "CHARACTER_CREATION":
     st.title("🗡️ 모험가 이야기: 여정의 시작")
@@ -232,7 +236,7 @@ if st.session_state.game_state == "CHARACTER_CREATION":
     
     name_input = st.text_input("모험가의 이름", value="아더")
     
-    st.subheader("📊 능력치 분배 (총 40 포인트)")
+    st.subheader("📊 능력치 분배 (기본 10 포인트)")
     col1, col2 = st.columns(2)
     str_val = col1.slider("💪 힘 (STR) - 전투/파괴", 8, 15, 10)
     dex_val = col1.slider("🏃 민첩 (DEX) - 회피/탈출", 8, 15, 10)
@@ -309,7 +313,7 @@ elif st.session_state.game_state == "DICE_RESULT":
         st.rerun()
 
 
-# D. 엔딩 및 게임 오버
+# D. 엔딩 화면
 elif st.session_state.game_state == "ENDING":
     st.balloons()
     st.title("🏆 모험 완수!")
@@ -325,6 +329,7 @@ elif st.session_state.game_state == "ENDING":
         init_game()
         st.rerun()
 
+# E. 게임 오버 화면
 elif st.session_state.game_state == "GAME_OVER":
     st.title("💀 차가운 안식")
     st.write(f"**{st.session_state.name}** 모험가는 모험 도중 비참하게 전사했습니다...")
