@@ -22,7 +22,7 @@ st.markdown("""
         background-color: #18181b;
         border: 1px solid #27272a;
         border-radius: 16px;
-        padding: 1.5rem;
+        padding: 2rem;
         margin-bottom: 1.5rem;
         box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
     }
@@ -100,7 +100,7 @@ def roll_dice(stat_name, difficulty):
 
 
 # ==========================================
-# 4. 상태 업데이트 및 이벤트 시스템 (이미지 추가)
+# 4. 상태 업데이트 및 이벤트 시스템
 # ==========================================
 def update_state(hp=0, gold=0):
     st.session_state.hp = max(0, min(st.session_state.max_hp, st.session_state.hp + hp))
@@ -111,8 +111,7 @@ EVENTS = [
     {
         "id": "goblin_ambush",
         "title": "👺 기습하는 고블린",
-        "image": "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80",  # 어두운 숲 이미지
-        "desc": "울창하고 어두운 숲길을 걷던 중, 풀숲에서 몽둥이를 든 고블린 두 마리가 기습해왔습니다!",
+        "desc": "울창한 숲길을 걷던 중, 풀숲에서 몽둥이를 든 고블린 두 마리가 튀어나왔습니다!",
         "choices": [
             {
                 "text": "⚔️ 정면으로 맞서 싸운다 (힘 [STR] 판정)",
@@ -137,8 +136,7 @@ EVENTS = [
     {
         "id": "mysterious_merchant",
         "title": "🧙‍♂️ 수상한 보따리상인",
-        "image": "https://images.unsplash.com/photo-1514539079130-25950c84af65?auto=format&fit=crop&w=800&q=80",  # 신비로운 포션/마법 이미지
-        "desc": "길가에서 어두운 로브를 쓴 상인이 신비로운 물약과 수상한 물품들을 늘어놓고 있습니다.",
+        "desc": "길가에서 어두운 로브를 쓴 상인이 신비로운 약병과 물건들을 늘어놓고 있습니다.",
         "choices": [
             {
                 "text": "💬 상인을 설득해 약초 값을 깎는다 (매력 [CHA] 판정)",
@@ -163,7 +161,6 @@ EVENTS = [
     {
         "id": "ancient_ruins",
         "title": "🏛️ 잊혀진 신전 유적",
-        "image": "https://images.unsplash.com/photo-1548625149-fc4a29cf7092?auto=format&fit=crop&w=800&q=80",  # 고대 유적지 이미지
         "desc": "이끼로 덮인 오래된 신전 입구를 발견했습니다. 내부에서 차가운 기운이 흘러나옵니다.",
         "choices": [
             {
@@ -204,6 +201,7 @@ def next_event():
 # ==========================================
 st.sidebar.title("📜 모험가 상태")
 
+# 'name'이 존재하는지 안전하게 확인 후 출력
 if "name" in st.session_state and st.session_state.game_state != "CHARACTER_CREATION":
     st.sidebar.subheader(f"👤 {st.session_state.name}")
     st.sidebar.write(f"📅 **모험 {st.session_state.day} 일차** / {st.session_state.max_day}일")
@@ -252,16 +250,12 @@ if st.session_state.game_state == "CHARACTER_CREATION":
         st.rerun()
 
 
-# B. 이벤트 및 선택지 화면 (이미지 렌더링 추가)
+# B. 이벤트 및 선택지 화면
 elif st.session_state.game_state == "EVENT":
     event = st.session_state.current_event
     
     st.caption(f"📅 모험 {st.session_state.day}일차 이벤트")
     st.title(event["title"])
-    
-    # 이벤트 상황에 맞는 이미지 출력
-    if "image" in event and event["image"]:
-        st.image(event["image"], use_column_width=True)
     
     st.markdown(f"""
     <div class="story-card">
@@ -273,6 +267,7 @@ elif st.session_state.game_state == "EVENT":
     
     for idx, choice in enumerate(event["choices"]):
         if st.button(choice["text"], key=f"choice_{idx}", use_container_width=True):
+            # 주사위 판정 실행
             res = roll_dice(choice["stat"], choice["dc"])
             
             if res["success"]:
@@ -298,6 +293,7 @@ elif st.session_state.game_state == "DICE_RESULT":
     
     st.title("🎲 판정 결과")
     
+    # 주사위 결과 연출
     st.markdown(f"""
     <div class="dice-result">
         🎲 <b>주사위 {res['dice']}</b> + 보정치 {res['bonus']} = <b>총합 {res['total']}</b> (목표 난이도: {res['difficulty']})
