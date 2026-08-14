@@ -2,145 +2,130 @@ import random
 import streamlit as st
 
 # ==========================================
-# 1. 웹앱 페이지 기본 설정 및 스타일
+# 1. 웹앱 페이지 기본 설정 및 디자인
 # ==========================================
 st.set_page_config(
-    page_title="🎲 초독창적 닉네임 생성기",
-    page_icon="🎲",
+    page_title="✨ 감성 & 힙 닉네임 생성기",
+    page_icon="✨",
     layout="centered"
 )
 
+# 모던하고 깔끔한 다크/미니멀 스타일 CSS
 st.markdown("""
 <style>
     .main .block-container {
-        max-width: 680px;
-        padding-top: 2rem;
-        padding-bottom: 2rem;
+        max-width: 600px;
+        padding-top: 2.5rem;
+        padding-bottom: 2.5rem;
     }
     .name-card {
-        background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%);
-        border: 2px solid #e2e8f0;
-        border-radius: 20px;
-        padding: 2.5rem 1.5rem;
+        background: #18181b;
+        border: 1px solid #27272a;
+        border-radius: 16px;
+        padding: 3rem 1.5rem;
         text-align: center;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
         margin: 1.5rem 0;
     }
     .generated-name {
-        font-size: clamp(1.6rem, 6.5vw, 3rem);
-        font-weight: 800;
-        color: #1e293b;
-        letter-spacing: 1px;
-        margin-bottom: 0.5rem;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: clamp(1.8rem, 7vw, 3rem);
+        font-weight: 700;
+        color: #f4f4f5;
+        letter-spacing: -0.5px;
+        margin-top: 0.8rem;
         word-break: keep-all;
     }
     .category-badge {
         display: inline-block;
-        background-color: #e0e7ff;
-        color: #4338ca;
-        padding: 0.3rem 0.8rem;
-        border-radius: 50px;
-        font-size: clamp(0.8rem, 2.5vw, 0.95rem);
-        font-weight: 600;
+        background-color: #27272a;
+        color: #a1a1aa;
+        padding: 0.35rem 0.9rem;
+        border-radius: 9999px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        border: 1px solid #3f3f46;
     }
     .stButton > button {
-        border-radius: 12px;
-        font-weight: 700;
+        border-radius: 10px;
+        font-weight: 600;
         height: 3.2rem;
-        font-size: 1.05rem;
-        transition: all 0.2s ease-in-out;
+        font-size: 1rem;
+        background-color: #f4f4f5;
+        color: #09090b;
+        border: none;
+        transition: all 0.2s ease;
     }
     .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        background-color: #e4e4e7;
+        transform: translateY(-1px);
     }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ==========================================
-# 2. 독창적 단어장 데이터베이스
+# 2. 감성/트렌디 정제된 단어장
 # ==========================================
 
-# A. 병맛/상황 행동 및 어미
-ACTIONS = ["아침에 눈뜨자마자", "퇴근 5분 전에", "커피 마시다 말고", "라면 먹다가", "갑자기", "실수로", "이유 없이", "밤샘 작업 중", "와이파이 끊겨서", "급발진해서"]
-ACTION_VERBS = ["춤추는", "오열하는", "탈주한", "체포된", "현타온", "급발진하는", "멍때리는", "고백하는", "사과하는", "기절한"]
+# A. [인스타/SNS 무드] 감성적인 무드 단어
+MOOD_PRE = ["새벽", "여름", "고요한", "파도", "그림자", "모스", "녹음", "시선", "여운", "밀물", "초록", "윤슬", "아침", "유연한"]
+MOOD_POST = ["노트", "아카이브", "스튜디오", "조각", "기록", "파편", "흐름", "잔향", "시절", "정원", "온도", "단면", "계절"]
 
-# B. 칭호/위치/신분
-TITLES = ["마왕", "지배자", "파괴자", "고수", "노예", "요정", "수호신", "방구석 대표", "길들이기 중인", "은둔고수"]
+# B. [요즘 힙한 계정] 은근히 무심하고 센스 있는 한글 조합
+HIP_PRE = ["약간", "그냥", "아마도", "무심한", "오늘의", "어쩌다", "자연스러운", "적당한", "취향의", "고요히"]
+HIP_POST = ["스무디", "취향", "순간", "하루", "오후", "산책", "무드", "로그", "모먼트", "컬렉션"]
 
-# C. 감성/신비/희귀 단어
-EMO_ADJ = ["새벽녘의", "우주 건너편의", "잊혀진", "칠흑 같은", "무지개 빛", "차원이 다른", "시공간을 넘어선", "심해 속"]
-EMO_NOUNS = ["안개", "메아리", "유성", "파도", "그림자", "소나기", "은하수", "초승달", "잔향"]
+# C. [영문 시크/트렌디 ID] SNS 영문 계정 스타일
+ENG_ADJ = ["soft", "pale", "deep", "dusk", "mellow", "raw", "pure", "cozy", "faded", "neat", "silent", "calm"]
+ENG_NOUN = ["blue", "archive", "note", "mood", "room", "log", "studio", "vibe", "layer", "wave", "tone", "grain"]
 
-# D. 음식/사물/동물
-ITEMS = ["민트초코", "마라탕", "아메리카노", "치즈케이크", "붕어빵", "키보드", "에어팟", "슬리퍼", "소울푸드"]
-ANIMALS = ["쿼카", "카피바라", "펭귄", "다람쥐", "판다", "고양이", "돌고래", "알파카", "시바견"]
-
-# E. 줄임말용 두 글자 조합
-WORD_A = ["개", "꿀", "초", "극", "킹", "갓", "열", "폭", "존", "대"]
-WORD_B = ["간", "잼", "맛", "공", "렉", "버", "딜", "탱", "딜", "짱"]
-
-# F. 특수 수식 및 영문 조합용
-SYMBOLS = ["v", "x", "Lv99", "Pro", "God", "Master", "Noob", "01"]
+# D. [세련된 게임/클랜 ID] 너무 치기어리지 않은 깔끔한 영문/한글 혼합
+GAME_PREFIX = ["Zero", "Aura", "Nova", "Flux", "Echo", "Lucid", "Vivid", "Apex", "Frost", "Shadow"]
+GAME_SUFFIX = ["Wave", "Core", "Vibe", "Shift", "Peak", "Drift", "Pulse", "Mind"]
 
 
 # ==========================================
-# 3. 6가지 독창적 생성 생성 알고리즘
+# 3. 자연스러운 조합 생성 로직
 # ==========================================
-def generate_creative_nickname(style_option):
-    """선택한 스타일에 따라 완전히 다른 패턴으로 닉네임을 생성합니다."""
-    
-    # 1) 병맛/상황극 스타일 (예: "퇴근 5분 전에 탈주한 쿼카")
-    if style_option == "🤪 B급 병맛/상황극":
-        act = random.choice(ACTIONS)
-        verb = random.choice(ACTION_VERBS)
-        target = random.choice(ANIMALS + ITEMS)
-        return f"{act} {verb} {target}"
+def generate_refined_nickname(style):
+    if style == "🕯️ 감성 무드 (인스타/블로그)":
+        # 예: 새벽 노트, 파도 아카이브, 고요한 정원
+        p1 = random.choice(MOOD_PRE)
+        p2 = random.choice(MOOD_POST)
+        return f"{p1} {p2}"
 
-    # 2) 판타지 칭호/세계관 스타일 (예: "방구석 대표 민트초코 파괴자")
-    elif style_option == "👑 칭호 & 세계관":
-        loc = random.choice(["전설의", "방구석", "지하세계", "우주 최강", "우리동네"])
-        item = random.choice(ITEMS + ANIMALS)
-        title = random.choice(TITLES)
-        return f"{loc} {item} {title}"
+    elif style == "☕ 무심하고 힙한 한글":
+        # 예: 약간의 취향, 그냥 오후, 오늘의 무드
+        p1 = random.choice(HIP_PRE)
+        p2 = random.choice(HIP_POST)
+        return f"{p1} {p2}"
 
-    # 3) 감성/새벽녘 스타일 (예: "새벽녘의 잊혀진 은하수")
-    elif style_option == "🌙 감성/새벽녘":
-        adj1 = random.choice(EMO_ADJ)
-        noun1 = random.choice(EMO_NOUNS)
-        return f"{adj1} {noun1}"
+    elif style == "🎧 시크한 영문 ID (sns_archive)":
+        # 예: soft_archive, pale.vibe, deep_room
+        adj = random.choice(ENG_ADJ)
+        noun = random.choice(ENG_NOUN)
+        sep = random.choice(["_", ".", ""])
+        return f"{adj}{sep}{noun}"
 
-    # 4) 트렌디 줄임말/합성어 스타일 (예: "킹맛공", "갓딜잼")
-    elif style_option == "⚡ 힙한 줄임말":
-        w1 = random.choice(WORD_A)
-        w2 = random.choice(WORD_B)
-        w3 = random.choice(WORD_B)
-        return f"{w1}{w2}{w3}"
+    elif style == "🎮 세련된 게임 ID":
+        # 예: Lucid Pulse, Nova Drift, Zero Shift
+        g1 = random.choice(GAME_PREFIX)
+        g2 = random.choice(GAME_SUFFIX)
+        sep = random.choice([" ", "_", ""])
+        return f"{g1}{sep}{g2}"
 
-    # 5) 게임 ID/레벨 스타일 (예: "Lv99_마라탕_Master")
-    elif style_option == "🎮 게임 아이디":
-        tag = random.choice(SYMBOLS)
-        core = random.choice(ITEMS + ANIMALS)
-        tag2 = random.choice(SYMBOLS)
-        return f"{tag}_{core}_{tag2}"
-
-    # 6) 랜덤 완전 고삐 풀린 조합 (모든 요소 무작위)
     else:
-        mixed_list = [
-            f"{random.choice(ACTIONS)} {random.choice(ITEMS)}",
-            f"{random.choice(EMO_ADJ)} {random.choice(ANIMALS)} {random.choice(TITLES)}",
-            f"{random.choice(WORD_A)}{random.choice(WORD_B)} {random.choice(ITEMS)}",
-            f"{random.choice(ACTION_VERBS)} {random.choice(EMO_NOUNS)}"
-        ]
-        return random.choice(mixed_list)
+        # 완전히 깔끔한 한글 2글자/3글자 단어 조합
+        pure_words = ["윤슬", "아침", "노을", "여운", "초록", "잔향", "계절", "파도", "고요", "모습", "단면"]
+        return f"{random.choice(pure_words)}{random.choice(pure_words)}"
 
 
 # ==========================================
 # 4. Session State 및 콜백
 # ==========================================
 if "generated_name" not in st.session_state:
-    st.session_state.generated_name = "버튼을 눌러보세요!"
+    st.session_state.generated_name = "클릭하여 생성"
 
 if "history" not in st.session_state:
     st.session_state.history = []
@@ -148,42 +133,43 @@ if "history" not in st.session_state:
 def handle_generate(style, count):
     results = []
     for _ in range(count):
-        name = generate_creative_nickname(style)
+        name = generate_refined_nickname(style)
         results.append(name)
         
     st.session_state.generated_name = results[0]
     
     for name in results:
-        st.session_state.history.insert(0, f"[{style.split()[1]}] {name}")
+        # 스타일명 깔끔하게 축약
+        clean_style = style.split()[1] if len(style.split()) > 1 else style
+        st.session_state.history.insert(0, f"[{clean_style}] {name}")
     st.session_state.history = st.session_state.history[:10]
 
 
 # ==========================================
-# 5. UI 화면 배치
+# 5. UI 레이아웃
 # ==========================================
-st.title("🎲 초독창적 닉네임 생성기")
-st.write("개성 넘치는 6가지 무드로 나만의 독특한 닉네임을 발굴하세요!")
+st.title("✨ 닉네임 생성기")
+st.caption("과하지 않고 깔끔한 요즘 감성의 닉네임을 생성합니다.")
 
 st.write("")
 
-col_cat, col_cnt = st.columns([2, 1])
+col_cat, col_cnt = st.columns([3, 1])
 
 with col_cat:
     selected_style = st.selectbox(
-        "🎭 닉네임 컨셉 선택",
+        "카테고리 선택",
         [
-            "🤪 B급 병맛/상황극",
-            "👑 칭호 & 세계관",
-            "🌙 감성/새벽녘",
-            "⚡ 힙한 줄임말",
-            "🎮 게임 아이디",
-            "🌀 무작위 카오스"
+            "🕯️ 감성 무드 (인스타/블로그)",
+            "☕ 무심하고 힙한 한글",
+            "🎧 시크한 영문 ID (sns_archive)",
+            "🎮 세련된 게임 ID",
+            "🍃 단정 한글 조합"
         ]
     )
 
 with col_cnt:
     generate_count = st.number_input(
-        "개수 (1~5)",
+        "개수",
         min_value=1,
         max_value=5,
         value=1,
@@ -191,11 +177,10 @@ with col_cnt:
     )
 
 st.button(
-    "✨ 독창적인 닉네임 뽑기",
+    "닉네임 생성하기",
     on_click=handle_generate,
     args=(selected_style, generate_count),
-    use_container_width=True,
-    type="primary"
+    use_container_width=True
 )
 
 st.markdown(f"""
@@ -207,10 +192,10 @@ st.markdown(f"""
 
 if st.session_state.history:
     st.divider()
-    st.subheader("📜 최근 생성된 닉네임 (최대 10개)")
+    st.subheader("최근 생성 기록")
     for idx, item in enumerate(st.session_state.history):
         st.text(f"{idx + 1}. {item}")
         
-    if st.button("🗑️ 기록 삭제", use_container_width=True):
+    if st.button("기록 삭제", use_container_width=True):
         st.session_state.history = []
         st.rerun()
