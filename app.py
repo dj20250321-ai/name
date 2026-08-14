@@ -2,25 +2,21 @@ import random
 import streamlit as st
 
 # ==========================================
-# 1. 웹앱 페이지 기본 설정 및 반응형 CSS 스타일
+# 1. 웹앱 페이지 기본 설정 및 스타일
 # ==========================================
 st.set_page_config(
-    page_title="🎲 랜덤 이름 생성기",
+    page_title="🎲 초독창적 닉네임 생성기",
     page_icon="🎲",
     layout="centered"
 )
 
-# Custom CSS: clamp()를 이용한 반응형 폰트 크기 및 깔끔한 카드 레이아웃 적용
 st.markdown("""
 <style>
-    /* 메인 컨테이너 최대 너비 및 여백 설정 */
     .main .block-container {
         max-width: 680px;
         padding-top: 2rem;
         padding-bottom: 2rem;
     }
-    
-    /* 생성된 이름을 보여주는 메인 카드 스타일 */
     .name-card {
         background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%);
         border: 2px solid #e2e8f0;
@@ -30,18 +26,14 @@ st.markdown("""
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
         margin: 1.5rem 0;
     }
-    
-    /* clamp(최소크기, 권장크기, 최대크기)를 사용해 모바일~PC 화면에 맞게 글자 크기 자동 조절 */
     .generated-name {
-        font-size: clamp(2rem, 8vw, 3.5rem);
+        font-size: clamp(1.6rem, 6.5vw, 3rem);
         font-weight: 800;
         color: #1e293b;
         letter-spacing: 1px;
         margin-bottom: 0.5rem;
         word-break: keep-all;
     }
-    
-    /* 이름 카테고리 태그 스타일 */
     .category-badge {
         display: inline-block;
         background-color: #e0e7ff;
@@ -51,8 +43,6 @@ st.markdown("""
         font-size: clamp(0.8rem, 2.5vw, 0.95rem);
         font-weight: 600;
     }
-
-    /* 버튼 기본 스타일 커스텀 */
     .stButton > button {
         border-radius: 12px;
         font-weight: 700;
@@ -60,7 +50,6 @@ st.markdown("""
         font-size: 1.05rem;
         transition: all 0.2s ease-in-out;
     }
-    
     .stButton > button:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -70,90 +59,126 @@ st.markdown("""
 
 
 # ==========================================
-# 2. 이름 데이터베이스 (Python 리스트 활용)
+# 2. 독창적 단어장 데이터베이스
 # ==========================================
-# (1) 한국어 이름 요소
-SUNG_LIST = ["김", "이", "박", "최", "정", "강", "조", "윤", "장", "임", "한", "오", "서", "신", "권", "황", "안", "송", "류", "홍"]
-NAME_LIST = ["민준", "서연", "도윤", "지우", "하준", "서윤", "주원", "지유", "지호", "하은", "준우", "민서", "우진", "윤서", "건우", "채원", "현우", "지민", "도현", "수아"]
 
-# (2) 재미있는 닉네임 요소 (수식어 + 명사)
-MODIFIER_LIST = ["용감한", "행복한", "잠자는", "빛나는", "신난", "배고픈", "슬기로운", "날씬한", "엉뚱한", "귀여운", "멋진", "친절한", "빠른"]
-NOUN_LIST = ["호랑이", "사자", "토끼", "다람쥐", "판다", "고양이", "강아지", "독수리", "펭귄", "돌고래", "곰인형", "개발자", "기획자"]
+# A. 병맛/상황 행동 및 어미
+ACTIONS = ["아침에 눈뜨자마자", "퇴근 5분 전에", "커피 마시다 말고", "라면 먹다가", "갑자기", "실수로", "이유 없이", "밤샘 작업 중", "와이파이 끊겨서", "급발진해서"]
+ACTION_VERBS = ["춤추는", "오열하는", "탈주한", "체포된", "현타온", "급발진하는", "멍때리는", "고백하는", "사과하는", "기절한"]
 
-# (3) 판타지 / 게임 캐릭터 이름 요소
-FANTASY_PREFIX = ["엘리", "아스", "루시", "발키", "제피", "세라", "크로", "드라", "실프", "레오", "카엘", "베르"]
-FANTASY_SUFFIX = ["온", "아", "스", "엘", "리온", "나", "우스", "라", "노스", "피아", "트리스", "에어"]
+# B. 칭호/위치/신분
+TITLES = ["마왕", "지배자", "파괴자", "고수", "노예", "요정", "수호신", "방구석 대표", "길들이기 중인", "은둔고수"]
 
-# (4) 영문 이름 (First Name + Last Name)
-FIRST_NAMES = ["Alex", "Emma", "Liam", "Olivia", "Noah", "Ava", "Ethan", "Sophia", "Lucas", "Isabella", "Mason", "Mia"]
-LAST_NAMES = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez"]
+# C. 감성/신비/희귀 단어
+EMO_ADJ = ["새벽녘의", "우주 건너편의", "잊혀진", "칠흑 같은", "무지개 빛", "차원이 다른", "시공간을 넘어선", "심해 속"]
+EMO_NOUNS = ["안개", "메아리", "유성", "파도", "그림자", "소나기", "은하수", "초승달", "잔향"]
+
+# D. 음식/사물/동물
+ITEMS = ["민트초코", "마라탕", "아메리카노", "치즈케이크", "붕어빵", "키보드", "에어팟", "슬리퍼", "소울푸드"]
+ANIMALS = ["쿼카", "카피바라", "펭귄", "다람쥐", "판다", "고양이", "돌고래", "알파카", "시바견"]
+
+# E. 줄임말용 두 글자 조합
+WORD_A = ["개", "꿀", "초", "극", "킹", "갓", "열", "폭", "존", "대"]
+WORD_B = ["간", "잼", "맛", "공", "렉", "버", "딜", "탱", "딜", "짱"]
+
+# F. 특수 수식 및 영문 조합용
+SYMBOLS = ["v", "x", "Lv99", "Pro", "God", "Master", "Noob", "01"]
 
 
 # ==========================================
-# 3. Session State (앱 상태 저장소) 초기화
+# 3. 6가지 독창적 생성 생성 알고리즘
+# ==========================================
+def generate_creative_nickname(style_option):
+    """선택한 스타일에 따라 완전히 다른 패턴으로 닉네임을 생성합니다."""
+    
+    # 1) 병맛/상황극 스타일 (예: "퇴근 5분 전에 탈주한 쿼카")
+    if style_option == "🤪 B급 병맛/상황극":
+        act = random.choice(ACTIONS)
+        verb = random.choice(ACTION_VERBS)
+        target = random.choice(ANIMALS + ITEMS)
+        return f"{act} {verb} {target}"
+
+    # 2) 판타지 칭호/세계관 스타일 (예: "방구석 대표 민트초코 파괴자")
+    elif style_option == "👑 칭호 & 세계관":
+        loc = random.choice(["전설의", "방구석", "지하세계", "우주 최강", "우리동네"])
+        item = random.choice(ITEMS + ANIMALS)
+        title = random.choice(TITLES)
+        return f"{loc} {item} {title}"
+
+    # 3) 감성/새벽녘 스타일 (예: "새벽녘의 잊혀진 은하수")
+    elif style_option == "🌙 감성/새벽녘":
+        adj1 = random.choice(EMO_ADJ)
+        noun1 = random.choice(EMO_NOUNS)
+        return f"{adj1} {noun1}"
+
+    # 4) 트렌디 줄임말/합성어 스타일 (예: "킹맛공", "갓딜잼")
+    elif style_option == "⚡ 힙한 줄임말":
+        w1 = random.choice(WORD_A)
+        w2 = random.choice(WORD_B)
+        w3 = random.choice(WORD_B)
+        return f"{w1}{w2}{w3}"
+
+    # 5) 게임 ID/레벨 스타일 (예: "Lv99_마라탕_Master")
+    elif style_option == "🎮 게임 아이디":
+        tag = random.choice(SYMBOLS)
+        core = random.choice(ITEMS + ANIMALS)
+        tag2 = random.choice(SYMBOLS)
+        return f"{tag}_{core}_{tag2}"
+
+    # 6) 랜덤 완전 고삐 풀린 조합 (모든 요소 무작위)
+    else:
+        mixed_list = [
+            f"{random.choice(ACTIONS)} {random.choice(ITEMS)}",
+            f"{random.choice(EMO_ADJ)} {random.choice(ANIMALS)} {random.choice(TITLES)}",
+            f"{random.choice(WORD_A)}{random.choice(WORD_B)} {random.choice(ITEMS)}",
+            f"{random.choice(ACTION_VERBS)} {random.choice(EMO_NOUNS)}"
+        ]
+        return random.choice(mixed_list)
+
+
+# ==========================================
+# 4. Session State 및 콜백
 # ==========================================
 if "generated_name" not in st.session_state:
     st.session_state.generated_name = "버튼을 눌러보세요!"
 
 if "history" not in st.session_state:
-    st.session_state.history = []  # 최근 생성된 이름 기록 저장용
+    st.session_state.history = []
 
-
-# ==========================================
-# 4. 이름 생성 핵심 로직 함수
-# ==========================================
-def generate_random_name(category, count=1):
-    """선택한 카테고리에 맞춰 이름을 랜덤 추출하는 함수"""
+def handle_generate(style, count):
     results = []
-    
     for _ in range(count):
-        if category == "🇰🇷 한국어 이름":
-            sung = random.choice(SUNG_LIST)
-            m_name = random.choice(NAME_LIST)
-            name = f"{sung}{m_name}"
-        elif category == "🐶 재미있는 닉네임":
-            mod = random.choice(MODIFIER_LIST)
-            noun = random.choice(NOUN_LIST)
-            name = f"{mod} {noun}"
-        elif category == "⚔️ 판타지/게임 캐릭터":
-            pre = random.choice(FANTASY_PREFIX)
-            suf = random.choice(FANTASY_SUFFIX)
-            name = f"{pre}{suf}"
-        elif category == "🇺🇸 영문 이름 (English)":
-            first = random.choice(FIRST_NAMES)
-            last = random.choice(LAST_NAMES)
-            name = f"{first} {last}"
+        name = generate_creative_nickname(style)
         results.append(name)
         
-    return results
-
-def handle_generate(category, count):
-    """버튼 클릭 시 호출되는 콜백 함수"""
-    new_names = generate_random_name(category, count)
-    # 대표 메인 이름 표시용
-    st.session_state.generated_name = new_names[0]
+    st.session_state.generated_name = results[0]
     
-    # 히스토리 목록 맨 앞에 최신 이름 추가 (최대 10개까지 유지)
-    for name in new_names:
-        st.session_state.history.insert(0, f"[{category.split()[1]}] {name}")
+    for name in results:
+        st.session_state.history.insert(0, f"[{style.split()[1]}] {name}")
     st.session_state.history = st.session_state.history[:10]
 
 
 # ==========================================
-# 5. 메인 앱 화면 레이아웃 구성
+# 5. UI 화면 배치
 # ==========================================
-st.title("🎲 랜덤 이름 생성기")
-st.write("원하는 스타일을 선택하고 나만의 무작위 이름을 빠르게 생성해 보세요!")
+st.title("🎲 초독창적 닉네임 생성기")
+st.write("개성 넘치는 6가지 무드로 나만의 독특한 닉네임을 발굴하세요!")
 
 st.write("")
 
-# 카테고리 및 생성 개수 설정 옵션
 col_cat, col_cnt = st.columns([2, 1])
 
 with col_cat:
-    selected_category = st.selectbox(
-        "🏷️ 이름 스타일 선택",
-        ["🇰🇷 한국어 이름", "🐶 재미있는 닉네임", "⚔️ 판타지/게임 캐릭터", "🇺🇸 영문 이름 (English)"]
+    selected_style = st.selectbox(
+        "🎭 닉네임 컨셉 선택",
+        [
+            "🤪 B급 병맛/상황극",
+            "👑 칭호 & 세계관",
+            "🌙 감성/새벽녘",
+            "⚡ 힙한 줄임말",
+            "🎮 게임 아이디",
+            "🌀 무작위 카오스"
+        ]
     )
 
 with col_cnt:
@@ -165,29 +190,24 @@ with col_cnt:
         step=1
     )
 
-# 이름 생성 버튼 (클릭 시 handle_generate 함수 실행)
 st.button(
-    "✨ 새로운 이름 생성하기",
+    "✨ 독창적인 닉네임 뽑기",
     on_click=handle_generate,
-    args=(selected_category, generate_count),
+    args=(selected_style, generate_count),
     use_container_width=True,
     type="primary"
 )
 
-# 메인 결과 카드 출력
 st.markdown(f"""
 <div class="name-card">
-    <span class="category-badge">{selected_category}</span>
+    <span class="category-badge">{selected_style}</span>
     <div class="generated-name">{st.session_state.generated_name}</div>
 </div>
 """, unsafe_allow_html=True)
 
-# 최근 뽑은 이름 히스토리 목록
 if st.session_state.history:
     st.divider()
-    st.subheader("📜 최근 생성된 이름 (최대 10개)")
-    
-    # 히스토리 항목을 태그 아이템 형태로 깔끔하게 표시
+    st.subheader("📜 최근 생성된 닉네임 (최대 10개)")
     for idx, item in enumerate(st.session_state.history):
         st.text(f"{idx + 1}. {item}")
         
