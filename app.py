@@ -1,286 +1,447 @@
-import time
 import random
+import time
 import streamlit as st
 
 # ==========================================
-# 1. 페이지 기본 설정 및 반응형 CSS
+# 1. 페이지 설정 및 다크 테마 UI 스타일링
 # ==========================================
 st.set_page_config(
-    page_title="🧠 뇌 풀기 미니게임천국",
-    page_icon="🧠",
+    page_title="🏰 Slay the Streamlit",
+    page_icon="⚔️",
     layout="centered"
 )
 
-# Custom CSS: 게임 카드 및 모던 다크 UI 디자인
 st.markdown("""
 <style>
     .main .block-container {
-        max-width: 650px;
+        max-width: 700px;
         padding-top: 2rem;
         padding-bottom: 2rem;
     }
-    
-    /* 순발력 테스트 배경 색상 카드 */
-    .game-box {
-        border-radius: 20px;
-        padding: 3rem 1.5rem;
-        text-align: center;
-        color: white;
-        font-weight: 700;
-        margin: 1.5rem 0;
-        transition: all 0.3s ease;
-    }
-    .box-wait { background-color: #ef4444; }    /* 대기: 빨강 */
-    .box-ready { background-color: #eab308; }   /* 준비: 노랑 */
-    .box-go { background-color: #22c55e; }      /* 누르세요: 초록 */
-    .box-result { background-color: #3b82f6; }  /* 결과: 파랑 */
-    
-    .box-title {
-        font-size: clamp(1.5rem, 5vw, 2.5rem);
-        margin-bottom: 0.5rem;
-    }
-    .box-sub {
-        font-size: clamp(0.9rem, 3vw, 1.2rem);
-        opacity: 0.9;
-    }
-    
-    /* 숫자 기억력 게임 숫자 표시 카드 */
-    .number-display {
+    .stat-box {
         background-color: #1e293b;
-        color: #38bdf8;
-        font-family: 'Courier New', Courier, monospace;
-        font-size: clamp(2.5rem, 10vw, 4rem);
-        font-weight: 800;
-        letter-spacing: 8px;
-        padding: 2rem;
-        border-radius: 16px;
-        text-align: center;
-        margin: 1.5rem 0;
-    }
-
-    .stButton > button {
+        border: 1px solid #334155;
         border-radius: 12px;
-        font-weight: 700;
-        height: 3.5rem;
-        font-size: 1.1rem;
+        padding: 1rem;
+        text-align: center;
+        color: #f8fafc;
+        margin-bottom: 1rem;
+    }
+    .monster-box {
+        background-color: #450a0a;
+        border: 2px solid #dc2626;
+        border-radius: 16px;
+        padding: 1.5rem;
+        text-align: center;
+        color: #fecaca;
+        margin: 1rem 0;
+    }
+    .node-card {
+        background-color: #0f172a;
+        border: 1px solid #334155;
+        border-radius: 10px;
+        padding: 1rem;
+        text-align: center;
     }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ==========================================
-# 2. Session State (앱 상태 저장소) 초기화
+# 2. 카드 및 데이터베이스 정의
 # ==========================================
-# 최고 기록 저장
-if "best_reaction_ms" not in st.session_state:
-    st.session_state.best_reaction_ms = None  # 순발력 최고 기록 (ms)
+# 카드 구조: {"id": ID, "name": 이름, "cost": 마나, "type": 유형, "value": 효과값, "desc": 설명}
+CARD_DATABASE = {
+    "strike": {"name": "⚔️ 타격", "cost": 1, "type": "attack", "value": 6, "desc": "피해 6을 줍니다."},
+    "defend": {"name": "🛡️ 수비", "cost": 1, "type": "block", "value": 5, "desc": "방어도 5를 얻습니다."},
+    "heavy_strike": {"name": "💥 강타", "cost": 2, "type": "attack", "value": 14, "desc": "피해 14를 줍니다."},
+    "iron_wave": {"name": "🌊 철퇴", "cost": 1, "type": "hybrid", "value": 5, "desc": "피해 5를 주고 방어도 5를 얻습니다."},
+    "heal_touch": {"name": "✨ 치유", "cost": 1, "type": "heal", "value": 6, "desc": "체력을 6 회복합니다."},
+}
 
-if "best_memory_score" not in st.session_state:
-    st.session_state.best_memory_score = 0     # 기억력 최고 기록 (최대 자릿수)
-
-# [게임 1: 순발력] 상태 변수
-if "reaction_state" not in st.session_state:
-    st.session_state.reaction_state = "IDLE"  # IDLE, WAITING, READY, RESULT, TOO_EARLY
-if "reaction_start_time" not in st.session_state:
-    st.session_state.reaction_start_time = 0.0
-if "reaction_result_ms" not in st.session_state:
-    st.session_state.reaction_result_ms = 0
-
-# [게임 2: 기억력] 상태 변수
-if "memory_state" not in st.session_state:
-    st.session_state.memory_state = "IDLE"  # IDLE, SHOW, INPUT, RESULT
-if "memory_digits" not in st.session_state:
-    st.session_state.memory_digits = 4       # 시작 자릿수
-if "target_number" not in st.session_state:
-    st.session_state.target_number = ""
+# 몬스터 데이터 목록
+MONSTER_DATABASE = [
+    {"name": "👺 슬라임", "hp": 24, "max_hp": 24, "attack": 6},
+    {"name": "Goblins 👺 고블린 전사", "hp": 32, "max_hp": 32, "attack": 8},
+    {"name": "🐺 굶주린 늑대", "hp": 28, "max_hp": 28, "attack": 10},
+    {"name": "👹 오거 (보스)", "hp": 55, "max_hp": 55, "attack": 14},
+]
 
 
 # ==========================================
-# 3. 게임 1: 순발력 테스트 로직
+# 3. 게임 상태 초기화 함수
 # ==========================================
-def render_reaction_game():
-    st.subheader("⚡ 1. 순발력 테스트")
-    st.caption("초록색으로 화면이 바뀌는 순간! 빛의 속도로 버튼을 누르세요.")
+def init_game():
+    st.session_state.game_state = "MAP"  # MAP, BATTLE, REST, SHOP, EVENT, GAME_OVER, VICTORY
+    st.session_state.floor = 1
+    st.session_state.max_floor = 6
+    st.session_state.gold = 50
     
-    # 최고 기록 표시
-    best_text = f"{st.session_state.best_reaction_ms} ms" if st.session_state.best_reaction_ms else "기록 없음"
-    st.info(f"🏆 **내 최고 기록:** {best_text}")
-
-    state = st.session_state.reaction_state
-
-    # 1) 대기 상태 (시작 전)
-    if state == "IDLE":
-        st.markdown("""
-        <div class="game-box box-wait">
-            <div class="box-title">준비되셨나요?</div>
-            <div class="box-sub">아래 [게임 시작] 버튼을 누르세요</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if st.button("▶️ 순발력 테스트 시작", use_container_width=True, type="primary"):
-            st.session_state.reaction_state = "WAITING"
-            st.rerun()
-
-    # 2) 준비 상태 (랜덤 시간 대기 중)
-    elif state == "WAITING":
-        st.markdown("""
-        <div class="game-box box-ready">
-            <div class="box-title">🔴 초록색이 되면 누르세요!</div>
-            <div class="box-sub">지금 누르면 실패합니다...</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # 성급하게 눌렀을 때 처리하기 위한 버튼
-        if st.button("⚠️ 너무 일찍 눌렀어요! (클릭 시 실패)", use_container_width=True):
-            st.session_state.reaction_state = "TOO_EARLY"
-            st.rerun()
-
-        # 2초~4.5초 사이의 무작위 대기 시간 후 초록색으로 변경
-        wait_time = random.uniform(2.0, 4.5)
-        time.sleep(wait_time)
-        
-        # time.monotonic()으로 정확한 초록색 전환 시점 기록
-        st.session_state.reaction_start_time = time.monotonic()
-        st.session_state.reaction_state = "READY"
-        st.rerun()
-
-    # 3) 클릭 상태 (초록색 전환완료)
-    elif state == "READY":
-        st.markdown("""
-        <div class="game-box box-go">
-            <div class="box-title">🟢 지금 바로 클릭하세요!</div>
-            <div class="box-sub">빠르게 버튼을 누르세요!</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        if st.button("⚡ 클릭!!!!!", use_container_width=True, type="primary"):
-            # 클릭 시점과 전환 시점의 차이 계산 (초 -> ms 단위 변환)
-            elapsed = time.monotonic() - st.session_state.reaction_start_time
-            reaction_ms = int(elapsed * 1000)
-            st.session_state.reaction_result_ms = reaction_ms
-            
-            # 최고 기록 갱신 확인
-            if (st.session_state.best_reaction_ms is None) or (reaction_ms < st.session_state.best_reaction_ms):
-                st.session_state.best_reaction_ms = reaction_ms
-                st.toast("🎉 축하합니다! 최고 기록 달성!", icon="🏆")
-
-            st.session_state.reaction_state = "RESULT"
-            st.rerun()
-
-    # 4) 결과 상태
-    elif state == "RESULT":
-        res = st.session_state.reaction_result_ms
-        st.markdown(f"""
-        <div class="game-box box-result">
-            <div class="box-title">반응 속도: {res} ms</div>
-            <div class="box-sub">{'🚀 빛의 속도입니다!' if res < 250 else '👍 훌륭한 순발력이에요!'}</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if st.button("🔄 다시 도전하기", use_container_width=True):
-            st.session_state.reaction_state = "IDLE"
-            st.rerun()
-
-    # 5) 실격 상태 (너무 일찍 누름)
-    elif state == "TOO_EARLY":
-        st.markdown("""
-        <div class="game-box box-wait">
-            <div class="box-title">❌ 너무 일찍 눌렀습니다!</div>
-            <div class="box-sub">초록색으로 바뀔 때까지 기다려야 합니다.</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if st.button("🔄 다시 도전하기", use_container_width=True):
-            st.session_state.reaction_state = "IDLE"
-            st.rerun()
-
-
-# ==========================================
-# 4. 게임 2: 숫자 기억력 게임 로직
-# ==========================================
-def render_memory_game():
-    st.subheader("🧩 2. 순간 숫자 기억력 테스트")
-    st.caption("화면에 3초간 지나가는 숫자를 암기해서 똑같이 입력하세요!")
+    # 플레이어 능력치
+    st.session_state.player_hp = 50
+    st.session_state.player_max_hp = 50
+    st.session_state.player_block = 0
+    st.session_state.energy = 3
+    st.session_state.max_energy = 3
     
-    st.info(f"🏆 **내 최고 기록:** {st.session_state.best_memory_score}자리 성공")
+    # 카드 덱 시스템
+    st.session_state.deck = ["strike", "strike", "strike", "strike", "defend", "defend", "defend", "iron_wave"]
+    st.session_state.draw_pile = []
+    st.session_state.hand = []
+    st.session_state.discard_pile = []
+    
+    # 현재 전투 몬스터
+    st.session_state.monster = None
+    st.session_state.monster_intent = 0
+    st.session_state.battle_log = []
 
-    state = st.session_state.memory_state
+    # 지도 노드 생성 (6층 규모)
+    st.session_state.map_nodes = [
+        ["전투"],
+        ["전투", "이벤트"],
+        ["상점", "휴식처"],
+        ["전투", "이벤트"],
+        ["휴식처"],
+        ["👹 보스전"]
+    ]
 
-    # 1) 시작 전 설정
-    if state == "IDLE":
-        st.write(f"현재 도전 난이도: **{st.session_state.memory_digits}자리 숫자**")
+
+if "game_state" not in st.session_state:
+    init_game()
+
+
+# ==========================================
+# 4. 카드 및 전투 관리 로직
+# ==========================================
+def start_battle(is_boss=False):
+    st.session_state.game_state = "BATTLE"
+    st.session_state.battle_log = ["⚔️ 전투가 시작되었습니다!"]
+    
+    # 몬스터 소환
+    if is_boss:
+        m_data = MONSTER_DATABASE[-1]
+    else:
+        m_data = random.choice(MONSTER_DATABASE[:-1])
         
-        if st.button("▶️ 숫자 암기 시작하기", use_container_width=True, type="primary"):
-            # 자릿수에 맞는 랜덤 숫자 생성
-            start_num = 10**(st.session_state.memory_digits - 1)
-            end_num = (10**st.session_state.memory_digits) - 1
-            st.session_state.target_number = str(random.randint(start_num, end_num))
+    st.session_state.monster = {
+        "name": m_data["name"],
+        "hp": m_data["hp"],
+        "max_hp": m_data["max_hp"],
+        "attack": m_data["attack"],
+        "block": 0
+    }
+    
+    # 덱 셔플 및 초기 손패 드로우 (5장)
+    st.session_state.draw_pile = st.session_state.deck.copy()
+    random.shuffle(st.session_state.draw_pile)
+    st.session_state.discard_pile = []
+    st.session_state.hand = []
+    st.session_state.player_block = 0
+    
+    start_player_turn()
+
+
+def start_player_turn():
+    st.session_state.energy = st.session_state.max_energy
+    st.session_state.player_block = 0  # 턴 시작 시 방어도 초기화
+    
+    # 손패에 있던 카드는 버림마 더미로 이동
+    st.session_state.discard_pile.extend(st.session_state.hand)
+    st.session_state.hand = []
+    
+    # 5장 드로우
+    draw_cards(5)
+
+
+def draw_cards(count):
+    for _ in range(count):
+        # 뽑을 덱이 비었으면 버림마 더미를 셔플해서 리필
+        if not st.session_state.draw_pile:
+            if not st.session_state.discard_pile:
+                break  # 뽑을 카드가 아예 없음
+            st.session_state.draw_pile = st.session_state.discard_pile.copy()
+            random.shuffle(st.session_state.draw_pile)
+            st.session_state.discard_pile = []
             
-            st.session_state.memory_state = "SHOW"
-            st.rerun()
+        card_id = st.session_state.draw_pile.pop()
+        st.session_state.hand.append(card_id)
 
-    # 2) 3초간 숫자 보여주기
-    elif state == "SHOW":
-        st.write("👇 아래 숫자를 잘 기억하세요!")
-        st.markdown(f"""
-        <div class="number-display">
-            {st.session_state.target_number}
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # 프로그레스 바로 3초 카운트다운 효과
-        progress_bar = st.progress(1.0)
-        for i in range(30, 0, -1):
-            time.sleep(0.1)
-            progress_bar.progress(i / 30)
-            
-        st.session_state.memory_state = "INPUT"
-        st.rerun()
 
-    # 3) 정답 입력 단계
-    elif state == "INPUT":
-        st.write(f"🤔 방금 본 **{st.session_state.memory_digits}자리 숫자**는 무엇이었나요?")
+def play_card(card_index):
+    card_id = st.session_state.hand[card_index]
+    card = CARD_DATABASE[card_id]
+    
+    # 에너지가 부족한 경우
+    if st.session_state.energy < card["cost"]:
+        st.warning("⚡ 에너지가 부족합니다!")
+        return
         
-        user_input = st.text_input("숫자 입력", key="user_answer_input", placeholder="숫자만 입력하세요")
+    # 에너지 차감 및 손패에서 버림마 더미로 이동
+    st.session_state.energy -= card["cost"]
+    played_card = st.session_state.hand.pop(card_index)
+    st.session_state.discard_pile.append(played_card)
+    
+    monster = st.session_state.monster
+    
+    # 카드 효과 적용
+    if card["type"] == "attack":
+        dmg = card["value"]
+        monster["hp"] = max(0, monster["hp"] - dmg)
+        st.session_state.battle_log.append(f"💥 {card['name']}! 몬스터에게 {dmg} 피해.")
         
-        if st.button("정답 제출", use_container_width=True, type="primary"):
-            if user_input.strip() == st.session_state.target_number:
-                # 정답 맞춤
-                current_digits = st.session_state.memory_digits
-                if current_digits > st.session_state.best_memory_score:
-                    st.session_state.best_memory_score = current_digits
-                
-                st.balloons()
-                st.success(f"🎉 정답입니다! ({st.session_state.target_number})")
-                
-                # 다음 단계로 난이도 상승 (최대 10자리)
-                st.session_state.memory_digits = min(10, current_digits + 1)
-                st.session_state.memory_state = "IDLE"
-                time.sleep(2)
+    elif card["type"] == "block":
+        st.session_state.player_block += card["value"]
+        st.session_state.battle_log.append(f"🛡️ {card['name']}! 방어도 +{card['value']}.")
+        
+    elif card["type"] == "hybrid":
+        monster["hp"] = max(0, monster["hp"] - card["value"])
+        st.session_state.player_block += card["value"]
+        st.session_state.battle_log.append(f"🌊 {card['name']}! 피해 {card['value']} & 방어도 +{card['value']}.")
+        
+    elif card["type"] == "heal":
+        st.session_state.player_hp = min(st.session_state.player_max_hp, st.session_state.player_hp + card["value"])
+        st.session_state.battle_log.append(f"✨ {card['name']}! 체력 {card['value']} 회복.")
+
+    # 몬스터 처치 확인
+    if monster["hp"] <= 0:
+        reward_gold = random.randint(15, 25)
+        st.session_state.gold += reward_gold
+        st.session_state.battle_log.append(f"🏆 {monster['name']} 처치! 골드 +{reward_gold}")
+        
+        if st.session_state.floor >= st.session_state.max_floor:
+            st.session_state.game_state = "VICTORY"
+        else:
+            st.session_state.floor += 1
+            st.session_state.game_state = "MAP"
+
+
+def end_player_turn():
+    # 몬스터 공격 턴
+    monster = st.session_state.monster
+    raw_damage = monster["attack"] + random.randint(-1, 2)
+    
+    # 플레이어 방어도 차감 후 데미지 적용
+    actual_damage = max(0, raw_damage - st.session_state.player_block)
+    st.session_state.player_hp -= actual_damage
+    
+    st.session_state.battle_log.append(f"👹 {monster['name']}의 공격! (피해 {raw_damage} / 방어됨 {raw_damage - actual_damage})")
+    
+    # 플레이어 패배 판정
+    if st.session_state.player_hp <= 0:
+        st.session_state.player_hp = 0
+        st.session_state.game_state = "GAME_OVER"
+    else:
+        start_player_turn()
+
+
+# ==========================================
+# 5. UI 렌더링 화면별 분기
+# ==========================================
+
+# A. 지도 렌더링 화면
+def render_map():
+    st.title("🗺️ 던전 지도")
+    st.write(f"현재 층수: **{st.session_state.floor} / {st.session_state.max_floor} 층**")
+    
+    current_nodes = st.session_state.map_nodes[st.session_state.floor - 1]
+    
+    st.markdown("### 📍 방문할 장소를 선택하세요")
+    cols = st.columns(len(current_nodes))
+    
+    for idx, node_type in enumerate(current_nodes):
+        with cols[idx]:
+            st.markdown(f"<div class='node-card'><h4>{node_type}</h4></div>", unsafe_allow_html=True)
+            st.write("")
+            if st.button(f"{node_type} 입장", key=f"node_{idx}", use_container_width=True):
+                if node_type == "전투":
+                    start_battle(is_boss=False)
+                elif node_type == "👹 보스전":
+                    start_battle(is_boss=True)
+                elif node_type == "휴식처":
+                    st.session_state.game_state = "REST"
+                elif node_type == "상점":
+                    st.session_state.game_state = "SHOP"
+                elif node_type == "이벤트":
+                    st.session_state.game_state = "EVENT"
                 st.rerun()
-            else:
-                # 오답
-                st.error(f"❌ 아쉽게 틀렸습니다! 정답은 [{st.session_state.target_number}] 이었습니다.")
-                # 난이도 초기화 (4자리)
-                st.session_state.memory_digits = 4
-                st.session_state.memory_state = "IDLE"
-                if st.button("다시 시도하기", use_container_width=True):
+
+
+# B. 카드 전투 화면
+def render_battle():
+    monster = st.session_state.monster
+    
+    # 플레이어 & 몬스터 상태창
+    col_p, col_m = st.columns(2)
+    with col_p:
+        st.markdown("<div class='stat-box'>", unsafe_allow_html=True)
+        st.write("🗡️ **용사 (Player)**")
+        st.progress(st.session_state.player_hp / st.session_state.player_max_hp)
+        st.write(f"❤️ HP: {st.session_state.player_hp}/{st.session_state.player_max_hp} | 🛡️ 방어: {st.session_state.player_block}")
+        st.write(f"⚡ 에너지: **{st.session_state.energy} / {st.session_state.max_energy}**")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+    with col_m:
+        st.markdown("<div class='monster-box'>", unsafe_allow_html=True)
+        st.write(f"**{monster['name']}**")
+        st.progress(monster['hp'] / monster['max_hp'])
+        st.write(f"❤️ HP: {monster['hp']}/{monster['max_hp']}")
+        st.write(f"⚔️ 예상 공격력: **{monster['attack']}")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.divider()
+
+    # 손패 카드 출력 및 사용
+    st.subheader("🃏 손패 (Hand)")
+    if st.session_state.hand:
+        card_cols = st.columns(len(st.session_state.hand))
+        for idx, card_id in enumerate(st.session_state.hand):
+            card = CARD_DATABASE[card_id]
+            with card_cols[idx]:
+                st.caption(f"비용: ⚡ {card['cost']}")
+                st.write(f"**")
+                st.caption(card['desc'])
+                if st.button("사용", key=f"card_{idx}", use_container_width=True):
+                    play_card(idx)
                     st.rerun()
+    else:
+        st.info("손패에 카드가 없습니다.")
+
+    # 턴 종료 버튼 및 덱 정보
+    col_turn, col_info = st.columns([2, 1])
+    with col_turn:
+        if st.button("⏭️ 턴 종료 (Monster Turn)", type="primary", use_container_width=True):
+            end_player_turn()
+            st.rerun()
+            
+    with col_info:
+        st.caption(f"🎴 남은 덱: {len(st.session_state.draw_pile)}장 | 🪦 버림마: {len(st.session_state.discard_pile)}장")
+
+    # 전투 기록 로그
+    with st.expander("📜 전투 기록", expanded=False):
+        for log in reversed(st.session_state.battle_log):
+            st.write(log)
+
+
+# C. 휴식처 화면
+def render_rest():
+    st.title("🔥 휴식처")
+    st.write("모닥불 옆에서 지친 몸을 달랩니다.")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🩹 휴식 (최대 체력의 30% 회복)", use_container_width=True):
+            heal_amount = int(st.session_state.player_max_hp * 0.3)
+            st.session_state.player_hp = min(st.session_state.player_max_hp, st.session_state.player_hp + heal_amount)
+            st.success(f"체력을 {heal_amount} 회복했습니다!")
+            time.sleep(1)
+            st.session_state.floor += 1
+            st.session_state.game_state = "MAP"
+            st.rerun()
+            
+    with col2:
+        if st.button("💪 최대 체력 +5 증가", use_container_width=True):
+            st.session_state.player_max_hp += 5
+            st.session_state.player_hp += 5
+            st.success("최대 체력이 5 증가했습니다!")
+            time.sleep(1)
+            st.session_state.floor += 1
+            st.session_state.game_state = "MAP"
+            st.rerun()
+
+
+# D. 상점 화면
+def render_shop():
+    st.title("🛒 미스터리 상점")
+    st.write(f"💰 소지한 골드: **{st.session_state.gold} G")
+    
+    st.subheader("새로운 카드 구입 (30G)")
+    shop_cards = ["heavy_strike", "iron_wave", "heal_touch"]
+    cols = st.columns(3)
+    
+    for idx, card_id in enumerate(shop_cards):
+        card = CARD_DATABASE[card_id]
+        with cols[idx]:
+            st.write(f"**")
+            st.caption(card['desc'])
+            if st.button(f"30G에 구매", key=f"buy_{idx}"):
+                if st.session_state.gold >= 30:
+                    st.session_state.gold -= 30
+                    st.session_state.deck.append(card_id)
+                    st.success(f"{card['name']} 카드를 덱에 추가했습니다!")
+                else:
+                    st.error("골드가 부족합니다!")
+
+    st.divider()
+    if st.button("🚪 상점 나가기 (다음 층 이동)", use_container_width=True):
+        st.session_state.floor += 1
+        st.session_state.game_state = "MAP"
+        st.rerun()
+
+
+# E. 무작위 이벤트 화면
+def render_event():
+    st.title("❓ 이상한 상자 발견")
+    st.write("던전을 탐험하던 중 빛나는 보물상자를 발견했습니다.")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📦 상자 열어보기", use_container_width=True):
+            if random.random() > 0.4:
+                st.session_state.gold += 40
+                st.balloons()
+                st.success("🎉 40 골드를 획득했습니다!")
+            else:
+                st.session_state.player_hp = max(1, st.session_state.player_hp - 10)
+                st.error("💥 함정이었습니다! 체력이 10 감소합니다.")
+            time.sleep(1.5)
+            st.session_state.floor += 1
+            st.session_state.game_state = "MAP"
+            st.rerun()
+            
+    with col2:
+        if st.button("🏃 무시하고 지나치기", use_container_width=True):
+            st.session_state.floor += 1
+            st.session_state.game_state = "MAP"
+            st.rerun()
 
 
 # ==========================================
-# 5. 메인 앱 화면 구성
+# 6. 메인 헤더 및 상태별 화면 스위칭
 # ==========================================
-st.title("🧠 뇌 풀기 미니게임천국")
-st.write("순발력과 순간 기억력을 테스트하고 매일 최고 기록을 갱신해 보세요!")
+st.sidebar.title("🏰 Slay the Streamlit")
+st.sidebar.write(f"❤️ HP: **{st.session_state.player_hp} / {st.session_state.player_max_hp}**")
+st.sidebar.write(f"💰 골드: **{st.session_state.gold} G**")
+st.sidebar.write(f"🎴 총 보유 카드 수: **{len(st.session_state.deck)}장**")
 
-st.write("")
+with st.sidebar.expander("🃏 보유 덱 목록 보기"):
+    for c_id in st.session_state.deck:
+        st.write(f"- {CARD_DATABASE[c_id]['name']}")
 
-# 탭(Tab) 메뉴로 두 게임 구분
-tab1, tab2 = st.tabs(["⚡ 순발력 테스트", "🧩 순간 기억력 게임"])
+if st.sidebar.button("🔄 처음부터 다시 시작"):
+    init_game()
+    st.rerun()
 
-with tab1:
-    render_reaction_game()
-
-with tab2:
-    render_memory_game()
+# 게임 상태 스위칭
+if st.session_state.game_state == "MAP":
+    render_map()
+elif st.session_state.game_state == "BATTLE":
+    render_battle()
+elif st.session_state.game_state == "REST":
+    render_rest()
+elif st.session_state.game_state == "SHOP":
+    render_shop()
+elif st.session_state.game_state == "EVENT":
+    render_event()
+elif st.session_state.game_state == "GAME_OVER":
+    st.error("💀 패배했습니다... 체력이 0이 되었습니다.")
+    if st.button("새 게임 시작하기", use_container_width=True):
+        init_game()
+        st.rerun()
+elif st.session_state.game_state == "VICTORY":
+    st.balloons()
+    st.title("🏆 축하합니다! 던전을 제패하셨습니다!")
+    st.write(f"최종 소지 골드: **{st.session_state.gold} G**")
+    if st.button("새 게임 시작하기", use_container_width=True):
+        init_game()
+        st.rerun()
+        
