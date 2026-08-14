@@ -1,201 +1,286 @@
+import time
 import random
 import streamlit as st
 
 # ==========================================
-# 1. 웹앱 페이지 기본 설정 및 디자인
+# 1. 페이지 기본 설정 및 반응형 CSS
 # ==========================================
 st.set_page_config(
-    page_title="✨ 감성 & 힙 닉네임 생성기",
-    page_icon="✨",
+    page_title="🧠 뇌 풀기 미니게임천국",
+    page_icon="🧠",
     layout="centered"
 )
 
-# 모던하고 깔끔한 다크/미니멀 스타일 CSS
+# Custom CSS: 게임 카드 및 모던 다크 UI 디자인
 st.markdown("""
 <style>
     .main .block-container {
-        max-width: 600px;
-        padding-top: 2.5rem;
-        padding-bottom: 2.5rem;
+        max-width: 650px;
+        padding-top: 2rem;
+        padding-bottom: 2rem;
     }
-    .name-card {
-        background: #18181b;
-        border: 1px solid #27272a;
-        border-radius: 16px;
+    
+    /* 순발력 테스트 배경 색상 카드 */
+    .game-box {
+        border-radius: 20px;
         padding: 3rem 1.5rem;
         text-align: center;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+        color: white;
+        font-weight: 700;
+        margin: 1.5rem 0;
+        transition: all 0.3s ease;
+    }
+    .box-wait { background-color: #ef4444; }    /* 대기: 빨강 */
+    .box-ready { background-color: #eab308; }   /* 준비: 노랑 */
+    .box-go { background-color: #22c55e; }      /* 누르세요: 초록 */
+    .box-result { background-color: #3b82f6; }  /* 결과: 파랑 */
+    
+    .box-title {
+        font-size: clamp(1.5rem, 5vw, 2.5rem);
+        margin-bottom: 0.5rem;
+    }
+    .box-sub {
+        font-size: clamp(0.9rem, 3vw, 1.2rem);
+        opacity: 0.9;
+    }
+    
+    /* 숫자 기억력 게임 숫자 표시 카드 */
+    .number-display {
+        background-color: #1e293b;
+        color: #38bdf8;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: clamp(2.5rem, 10vw, 4rem);
+        font-weight: 800;
+        letter-spacing: 8px;
+        padding: 2rem;
+        border-radius: 16px;
+        text-align: center;
         margin: 1.5rem 0;
     }
-    .generated-name {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        font-size: clamp(1.8rem, 7vw, 3rem);
-        font-weight: 700;
-        color: #f4f4f5;
-        letter-spacing: -0.5px;
-        margin-top: 0.8rem;
-        word-break: keep-all;
-    }
-    .category-badge {
-        display: inline-block;
-        background-color: #27272a;
-        color: #a1a1aa;
-        padding: 0.35rem 0.9rem;
-        border-radius: 9999px;
-        font-size: 0.85rem;
-        font-weight: 500;
-        border: 1px solid #3f3f46;
-    }
+
     .stButton > button {
-        border-radius: 10px;
-        font-weight: 600;
-        height: 3.2rem;
-        font-size: 1rem;
-        background-color: #f4f4f5;
-        color: #09090b;
-        border: none;
-        transition: all 0.2s ease;
-    }
-    .stButton > button:hover {
-        background-color: #e4e4e7;
-        transform: translateY(-1px);
+        border-radius: 12px;
+        font-weight: 700;
+        height: 3.5rem;
+        font-size: 1.1rem;
     }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ==========================================
-# 2. 감성/트렌디 정제된 단어장
+# 2. Session State (앱 상태 저장소) 초기화
 # ==========================================
+# 최고 기록 저장
+if "best_reaction_ms" not in st.session_state:
+    st.session_state.best_reaction_ms = None  # 순발력 최고 기록 (ms)
 
-# A. [인스타/SNS 무드] 감성적인 무드 단어
-MOOD_PRE = ["새벽", "여름", "고요한", "파도", "그림자", "모스", "녹음", "시선", "여운", "밀물", "초록", "윤슬", "아침", "유연한"]
-MOOD_POST = ["노트", "아카이브", "스튜디오", "조각", "기록", "파편", "흐름", "잔향", "시절", "정원", "온도", "단면", "계절"]
+if "best_memory_score" not in st.session_state:
+    st.session_state.best_memory_score = 0     # 기억력 최고 기록 (최대 자릿수)
 
-# B. [요즘 힙한 계정] 은근히 무심하고 센스 있는 한글 조합
-HIP_PRE = ["약간", "그냥", "아마도", "무심한", "오늘의", "어쩌다", "자연스러운", "적당한", "취향의", "고요히"]
-HIP_POST = ["스무디", "취향", "순간", "하루", "오후", "산책", "무드", "로그", "모먼트", "컬렉션"]
+# [게임 1: 순발력] 상태 변수
+if "reaction_state" not in st.session_state:
+    st.session_state.reaction_state = "IDLE"  # IDLE, WAITING, READY, RESULT, TOO_EARLY
+if "reaction_start_time" not in st.session_state:
+    st.session_state.reaction_start_time = 0.0
+if "reaction_result_ms" not in st.session_state:
+    st.session_state.reaction_result_ms = 0
 
-# C. [영문 시크/트렌디 ID] SNS 영문 계정 스타일
-ENG_ADJ = ["soft", "pale", "deep", "dusk", "mellow", "raw", "pure", "cozy", "faded", "neat", "silent", "calm"]
-ENG_NOUN = ["blue", "archive", "note", "mood", "room", "log", "studio", "vibe", "layer", "wave", "tone", "grain"]
-
-# D. [세련된 게임/클랜 ID] 너무 치기어리지 않은 깔끔한 영문/한글 혼합
-GAME_PREFIX = ["Zero", "Aura", "Nova", "Flux", "Echo", "Lucid", "Vivid", "Apex", "Frost", "Shadow"]
-GAME_SUFFIX = ["Wave", "Core", "Vibe", "Shift", "Peak", "Drift", "Pulse", "Mind"]
-
-
-# ==========================================
-# 3. 자연스러운 조합 생성 로직
-# ==========================================
-def generate_refined_nickname(style):
-    if style == "🕯️ 감성 무드 (인스타/블로그)":
-        # 예: 새벽 노트, 파도 아카이브, 고요한 정원
-        p1 = random.choice(MOOD_PRE)
-        p2 = random.choice(MOOD_POST)
-        return f"{p1} {p2}"
-
-    elif style == "☕ 무심하고 힙한 한글":
-        # 예: 약간의 취향, 그냥 오후, 오늘의 무드
-        p1 = random.choice(HIP_PRE)
-        p2 = random.choice(HIP_POST)
-        return f"{p1} {p2}"
-
-    elif style == "🎧 시크한 영문 ID (sns_archive)":
-        # 예: soft_archive, pale.vibe, deep_room
-        adj = random.choice(ENG_ADJ)
-        noun = random.choice(ENG_NOUN)
-        sep = random.choice(["_", ".", ""])
-        return f"{adj}{sep}{noun}"
-
-    elif style == "🎮 세련된 게임 ID":
-        # 예: Lucid Pulse, Nova Drift, Zero Shift
-        g1 = random.choice(GAME_PREFIX)
-        g2 = random.choice(GAME_SUFFIX)
-        sep = random.choice([" ", "_", ""])
-        return f"{g1}{sep}{g2}"
-
-    else:
-        # 완전히 깔끔한 한글 2글자/3글자 단어 조합
-        pure_words = ["윤슬", "아침", "노을", "여운", "초록", "잔향", "계절", "파도", "고요", "모습", "단면"]
-        return f"{random.choice(pure_words)}{random.choice(pure_words)}"
+# [게임 2: 기억력] 상태 변수
+if "memory_state" not in st.session_state:
+    st.session_state.memory_state = "IDLE"  # IDLE, SHOW, INPUT, RESULT
+if "memory_digits" not in st.session_state:
+    st.session_state.memory_digits = 4       # 시작 자릿수
+if "target_number" not in st.session_state:
+    st.session_state.target_number = ""
 
 
 # ==========================================
-# 4. Session State 및 콜백
+# 3. 게임 1: 순발력 테스트 로직
 # ==========================================
-if "generated_name" not in st.session_state:
-    st.session_state.generated_name = "클릭하여 생성"
-
-if "history" not in st.session_state:
-    st.session_state.history = []
-
-def handle_generate(style, count):
-    results = []
-    for _ in range(count):
-        name = generate_refined_nickname(style)
-        results.append(name)
-        
-    st.session_state.generated_name = results[0]
+def render_reaction_game():
+    st.subheader("⚡ 1. 순발력 테스트")
+    st.caption("초록색으로 화면이 바뀌는 순간! 빛의 속도로 버튼을 누르세요.")
     
-    for name in results:
-        # 스타일명 깔끔하게 축약
-        clean_style = style.split()[1] if len(style.split()) > 1 else style
-        st.session_state.history.insert(0, f"[{clean_style}] {name}")
-    st.session_state.history = st.session_state.history[:10]
+    # 최고 기록 표시
+    best_text = f"{st.session_state.best_reaction_ms} ms" if st.session_state.best_reaction_ms else "기록 없음"
+    st.info(f"🏆 **내 최고 기록:** {best_text}")
+
+    state = st.session_state.reaction_state
+
+    # 1) 대기 상태 (시작 전)
+    if state == "IDLE":
+        st.markdown("""
+        <div class="game-box box-wait">
+            <div class="box-title">준비되셨나요?</div>
+            <div class="box-sub">아래 [게임 시작] 버튼을 누르세요</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("▶️ 순발력 테스트 시작", use_container_width=True, type="primary"):
+            st.session_state.reaction_state = "WAITING"
+            st.rerun()
+
+    # 2) 준비 상태 (랜덤 시간 대기 중)
+    elif state == "WAITING":
+        st.markdown("""
+        <div class="game-box box-ready">
+            <div class="box-title">🔴 초록색이 되면 누르세요!</div>
+            <div class="box-sub">지금 누르면 실패합니다...</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # 성급하게 눌렀을 때 처리하기 위한 버튼
+        if st.button("⚠️ 너무 일찍 눌렀어요! (클릭 시 실패)", use_container_width=True):
+            st.session_state.reaction_state = "TOO_EARLY"
+            st.rerun()
+
+        # 2초~4.5초 사이의 무작위 대기 시간 후 초록색으로 변경
+        wait_time = random.uniform(2.0, 4.5)
+        time.sleep(wait_time)
+        
+        # time.monotonic()으로 정확한 초록색 전환 시점 기록
+        st.session_state.reaction_start_time = time.monotonic()
+        st.session_state.reaction_state = "READY"
+        st.rerun()
+
+    # 3) 클릭 상태 (초록색 전환완료)
+    elif state == "READY":
+        st.markdown("""
+        <div class="game-box box-go">
+            <div class="box-title">🟢 지금 바로 클릭하세요!</div>
+            <div class="box-sub">빠르게 버튼을 누르세요!</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("⚡ 클릭!!!!!", use_container_width=True, type="primary"):
+            # 클릭 시점과 전환 시점의 차이 계산 (초 -> ms 단위 변환)
+            elapsed = time.monotonic() - st.session_state.reaction_start_time
+            reaction_ms = int(elapsed * 1000)
+            st.session_state.reaction_result_ms = reaction_ms
+            
+            # 최고 기록 갱신 확인
+            if (st.session_state.best_reaction_ms is None) or (reaction_ms < st.session_state.best_reaction_ms):
+                st.session_state.best_reaction_ms = reaction_ms
+                st.toast("🎉 축하합니다! 최고 기록 달성!", icon="🏆")
+
+            st.session_state.reaction_state = "RESULT"
+            st.rerun()
+
+    # 4) 결과 상태
+    elif state == "RESULT":
+        res = st.session_state.reaction_result_ms
+        st.markdown(f"""
+        <div class="game-box box-result">
+            <div class="box-title">반응 속도: {res} ms</div>
+            <div class="box-sub">{'🚀 빛의 속도입니다!' if res < 250 else '👍 훌륭한 순발력이에요!'}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("🔄 다시 도전하기", use_container_width=True):
+            st.session_state.reaction_state = "IDLE"
+            st.rerun()
+
+    # 5) 실격 상태 (너무 일찍 누름)
+    elif state == "TOO_EARLY":
+        st.markdown("""
+        <div class="game-box box-wait">
+            <div class="box-title">❌ 너무 일찍 눌렀습니다!</div>
+            <div class="box-sub">초록색으로 바뀔 때까지 기다려야 합니다.</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("🔄 다시 도전하기", use_container_width=True):
+            st.session_state.reaction_state = "IDLE"
+            st.rerun()
 
 
 # ==========================================
-# 5. UI 레이아웃
+# 4. 게임 2: 숫자 기억력 게임 로직
 # ==========================================
-st.title("✨ 닉네임 생성기")
-st.caption("과하지 않고 깔끔한 요즘 감성의 닉네임을 생성합니다.")
+def render_memory_game():
+    st.subheader("🧩 2. 순간 숫자 기억력 테스트")
+    st.caption("화면에 3초간 지나가는 숫자를 암기해서 똑같이 입력하세요!")
+    
+    st.info(f"🏆 **내 최고 기록:** {st.session_state.best_memory_score}자리 성공")
+
+    state = st.session_state.memory_state
+
+    # 1) 시작 전 설정
+    if state == "IDLE":
+        st.write(f"현재 도전 난이도: **{st.session_state.memory_digits}자리 숫자**")
+        
+        if st.button("▶️ 숫자 암기 시작하기", use_container_width=True, type="primary"):
+            # 자릿수에 맞는 랜덤 숫자 생성
+            start_num = 10**(st.session_state.memory_digits - 1)
+            end_num = (10**st.session_state.memory_digits) - 1
+            st.session_state.target_number = str(random.randint(start_num, end_num))
+            
+            st.session_state.memory_state = "SHOW"
+            st.rerun()
+
+    # 2) 3초간 숫자 보여주기
+    elif state == "SHOW":
+        st.write("👇 아래 숫자를 잘 기억하세요!")
+        st.markdown(f"""
+        <div class="number-display">
+            {st.session_state.target_number}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # 프로그레스 바로 3초 카운트다운 효과
+        progress_bar = st.progress(1.0)
+        for i in range(30, 0, -1):
+            time.sleep(0.1)
+            progress_bar.progress(i / 30)
+            
+        st.session_state.memory_state = "INPUT"
+        st.rerun()
+
+    # 3) 정답 입력 단계
+    elif state == "INPUT":
+        st.write(f"🤔 방금 본 **{st.session_state.memory_digits}자리 숫자**는 무엇이었나요?")
+        
+        user_input = st.text_input("숫자 입력", key="user_answer_input", placeholder="숫자만 입력하세요")
+        
+        if st.button("정답 제출", use_container_width=True, type="primary"):
+            if user_input.strip() == st.session_state.target_number:
+                # 정답 맞춤
+                current_digits = st.session_state.memory_digits
+                if current_digits > st.session_state.best_memory_score:
+                    st.session_state.best_memory_score = current_digits
+                
+                st.balloons()
+                st.success(f"🎉 정답입니다! ({st.session_state.target_number})")
+                
+                # 다음 단계로 난이도 상승 (최대 10자리)
+                st.session_state.memory_digits = min(10, current_digits + 1)
+                st.session_state.memory_state = "IDLE"
+                time.sleep(2)
+                st.rerun()
+            else:
+                # 오답
+                st.error(f"❌ 아쉽게 틀렸습니다! 정답은 [{st.session_state.target_number}] 이었습니다.")
+                # 난이도 초기화 (4자리)
+                st.session_state.memory_digits = 4
+                st.session_state.memory_state = "IDLE"
+                if st.button("다시 시도하기", use_container_width=True):
+                    st.rerun()
+
+
+# ==========================================
+# 5. 메인 앱 화면 구성
+# ==========================================
+st.title("🧠 뇌 풀기 미니게임천국")
+st.write("순발력과 순간 기억력을 테스트하고 매일 최고 기록을 갱신해 보세요!")
 
 st.write("")
 
-col_cat, col_cnt = st.columns([3, 1])
+# 탭(Tab) 메뉴로 두 게임 구분
+tab1, tab2 = st.tabs(["⚡ 순발력 테스트", "🧩 순간 기억력 게임"])
 
-with col_cat:
-    selected_style = st.selectbox(
-        "카테고리 선택",
-        [
-            "🕯️ 감성 무드 (인스타/블로그)",
-            "☕ 무심하고 힙한 한글",
-            "🎧 시크한 영문 ID (sns_archive)",
-            "🎮 세련된 게임 ID",
-            "🍃 단정 한글 조합"
-        ]
-    )
+with tab1:
+    render_reaction_game()
 
-with col_cnt:
-    generate_count = st.number_input(
-        "개수",
-        min_value=1,
-        max_value=5,
-        value=1,
-        step=1
-    )
-
-st.button(
-    "닉네임 생성하기",
-    on_click=handle_generate,
-    args=(selected_style, generate_count),
-    use_container_width=True
-)
-
-st.markdown(f"""
-<div class="name-card">
-    <span class="category-badge">{selected_style}</span>
-    <div class="generated-name">{st.session_state.generated_name}</div>
-</div>
-""", unsafe_allow_html=True)
-
-if st.session_state.history:
-    st.divider()
-    st.subheader("최근 생성 기록")
-    for idx, item in enumerate(st.session_state.history):
-        st.text(f"{idx + 1}. {item}")
-        
-    if st.button("기록 삭제", use_container_width=True):
-        st.session_state.history = []
-        st.rerun()
+with tab2:
+    render_memory_game()
